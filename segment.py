@@ -23,14 +23,22 @@
  
 #print(f"Hi {person}, please tell us about your {service} needs.")
 
-leads = [ 
-{"name": "Amina", "days_since_contact":45},
-{"name": "Chinedu", "days_since_contact":200},
-{"name": "Tunde", "days_since_contact":90},
+leads = [
+    {"name": "Amina", "days_since_contact" :20},
+    {"name": "Chinedu","days_since_contact" :200},
+    {"name": "Tunde", "days_since_contact" :90},
+    {"name": "Ngozi", "days_since_contact" :400},
 ]
 
 for lead in leads:
-	if lead["days_since_contact"] < 60:
-		print(f'{lead["name"]}: Hot - call this one')
-	else:
-		print(f'{lead["name"]}: Cold - send a message')
+
+    days = int(lead["days_since_contact"])
+
+    if days < 60:
+        print(f"{lead["name"]} : Hot - call this one")
+
+    elif days < 180:
+        print(f"{lead["name"]} : Warm - send a message")
+
+    else:
+        print(f"{lead["name"]} : Cold - send a message")
