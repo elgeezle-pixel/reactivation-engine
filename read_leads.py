@@ -7,7 +7,7 @@ def write_segment(filename, segment):
         writer.writerows(segment)
 
 def classify(days):
-    if days < 60:
+    if days < 30:
         return "hot"
     elif days < 180:
         return "warm"
