@@ -8,7 +8,24 @@ load_dotenv()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")) 
 
 def write_message(name, days):
-    prompt = f"""Write a short Whatsapp message to {name}, who enquired about our service {days} ago and never replied. Friendly, Nigerian business tone, under 40 words. No emoji. Return on messages."""
+    prompt = f"""You write WhatsApp follow-ups for a Nigerian home
+services company. Your messages sound like a real person typing on
+their phone, not a marketing team.
+
+Write a message to {name}, who enquired {days} days ago and never
+replied.
+
+Rules:
+- Under 35 words
+- No emoji
+- Never open with "Hope you're doing well" or "I hope this finds you"
+- Never use "just following up", "checking in", or "reaching out"
+- Be specific about the gap in time, don't be vague about it
+- End with one easy question they can answer in three words
+- Never mention offers, availability, discounts or promotions. You have no information 
+about any of these.
+
+Return only the message text."""
 
     response = client.messages.create(
     model= "claude-sonnet-4-5",
