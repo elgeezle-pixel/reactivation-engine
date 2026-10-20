@@ -6,6 +6,7 @@ from datetime import datetime
 from read_leads import write_message, classify
 from eval_messages import (
     check_length,
+    check_no_fault_admission,
     check_question,
     check_banned_phrases,
     check_time_gap,
@@ -22,6 +23,7 @@ CHECKS = [
     ("banned_phrases", lambda message, days: check_banned_phrases(message)),
     ("time_gap", lambda message, days: check_time_gap(message, days)),
     ("no_invented", lambda message, days: check_no_invented_claims(message)),
+        ("no_fault", lambda message, days: check_no_fault_admission(message)),
 ]
 
 

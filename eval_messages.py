@@ -59,7 +59,25 @@ def check_no_invented_claims(message):
             return False
     return True
 
+# Phrases where the message apologises or admits the business failed to
+# respond. Nothing in our data supports that, and it hurts the client.
+FAULT_PHRASES = [
+    "sorry",
+    "apolog",
+    "never got back",
+    "didn't get back",
+    "did not get back",
+    "delay",
+    "slow to",
+]
 
+
+def check_no_fault_admission(message):
+    text = message.lower().replace("’", "'")
+    for phrase in FAULT_PHRASES:
+        if phrase in text:
+            return False
+    return True
 # Tests (expected output in the comment on each line)
 if __name__ == "__main__":
 

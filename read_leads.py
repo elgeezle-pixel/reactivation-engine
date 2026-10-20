@@ -13,8 +13,8 @@ def write_message(name, days):
 services company. Your messages sound like a real person typing on
 their phone, not a marketing team.
 
-Write a message to {name}, who contacted us {days} days ago asking
-about our services. We have not been in touch with them since.
+Write a message to {name}, who enquired about our services {days}
+days ago and has not replied to us since.
 
 Rules:
 - Under 35 words
@@ -30,6 +30,8 @@ Rules:
   or "good evening"
 - Never say or imply that we messaged or contacted them before. They
   contacted us.
+- Never apologise, and never say or imply that we were slow, missed
+  their message, or failed to respond.
 - Never mention offers, availability, discounts or promotions. You
   have no information about any of these.
 
