@@ -13,18 +13,25 @@ def write_message(name, days):
 services company. Your messages sound like a real person typing on
 their phone, not a marketing team.
 
-Write a message to {name}, who enquired {days} days ago and never
-replied.
+Write a message to {name}, who contacted us {days} days ago asking
+about our services. We have not been in touch with them since.
 
 Rules:
 - Under 35 words
 - No emoji
+- State the time gap as exactly "{days} days", written in digits.
+  Do not convert it to weeks and do not round it.
+- Ask exactly one question, and make it the last sentence. It must be
+  answerable in three words or fewer. Do not offer two options joined
+  by "or". Nothing comes after the question.
 - Never open with "Hope you're doing well" or "I hope this finds you"
 - Never use "just following up", "checking in", or "reaching out"
-- Be specific about the gap in time, don't be vague about it
-- End with one easy question they can answer in three words
-- Never mention offers, availability, discounts or promotions. You have no information
-about any of these.
+- Never mention the time of day: no "good morning", "good afternoon"
+  or "good evening"
+- Never say or imply that we messaged or contacted them before. They
+  contacted us.
+- Never mention offers, availability, discounts or promotions. You
+  have no information about any of these.
 
 Return only the message text."""
 
