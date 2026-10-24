@@ -1,11 +1,13 @@
-name, days_since_contact
-Amina, 20
-Chinedu, 200
-Tunde, 90
-Ngozi, 400
-Blessing,
-Yusuf, ninety
-Mr Bola, 25
-Usman, 30
-John, 14
-Lex, 10
+name,phone,service,days_since_contact,quote_sent
+Amina,08000000001,AC repair,20,yes
+Mr Bola,08000000002,plumbing,25,no
+John,08000000003,house painting,14,yes
+Lex,08000000004,generator servicing,10,no
+Chinedu,08000000005,AC repair,200,yes
+Tunde,08000000006,tiling,90,no
+Ngozi,08000000007,plumbing,400,yes
+Fatima,08000000008,electrical wiring,60,yes
+Emeka,08000000009,house painting,abc,yes
+Kemi,08000000010,,15,yes
+Sade,08000000011,AC repair,12,maybe
+

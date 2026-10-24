@@ -1,52 +1,55 @@
-import csv
 import os
+import re
 import sys
+from collections import Counter
 from datetime import datetime
+from difflib import SequenceMatcher
+from itertools import combinations
 
-from read_leads import write_message, classify
+from read_leads import load_leads, write_message
 from eval_messages import (
     check_length,
-    check_no_fault_admission,
     check_question,
     check_banned_phrases,
     check_time_gap,
     check_no_invented_claims,
+    check_no_fault_admission,
+    check_quote_consistency,
+    check_mentions_service,
 )
 
 RUNS_PER_LEAD = 5
 
-# Every check gets the same two inputs (message, days) so we can loop
-# over them. Checks that don't need "days" simply ignore it.
+# Each check receives the message and the full lead, so checks that need
+# the day count, quote status or service can read them.
 CHECKS = [
-    ("length", lambda message, days: check_length(message)),
-    ("one_question", lambda message, days: check_question(message)),
-    ("banned_phrases", lambda message, days: check_banned_phrases(message)),
-    ("time_gap", lambda message, days: check_time_gap(message, days)),
-    ("no_invented", lambda message, days: check_no_invented_claims(message)),
-        ("no_fault", lambda message, days: check_no_fault_admission(message)),
+    ("length", lambda m, lead: check_length(m)),
+    ("one_question", lambda m, lead: check_question(m)),
+    ("banned_phrases", lambda m, lead: check_banned_phrases(m)),
+    ("time_gap", lambda m, lead: check_time_gap(m, lead["days"])),
+    ("no_invented", lambda m, lead: check_no_invented_claims(m)),
+    ("no_fault", lambda m, lead: check_no_fault_admission(m)),
+    ("quote_match", lambda m, lead: check_quote_consistency(m, lead["quote_sent"])),
+    ("names_service", lambda m, lead: check_mentions_service(m, lead["service"])),
 ]
 
 
-def load_hot_leads():
-    with open("leads.csv") as f:
-        rows = list(csv.DictReader(f, skipinitialspace=True))
+def similarity(a, b):
+    # 0.0 = nothing in common, 1.0 = identical text
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
-    hot = []
-    skipped = 0
-    for row in rows:
-        try:
-            days = int(row["days_since_contact"])
-        except ValueError:
-            skipped += 1
-            continue
-        if classify(days) == "hot":
-            hot.append({"name": row["name"], "days": days})
-    return hot, skipped
+
+def final_question(message):
+    text = " ".join(message.split())
+    parts = re.split(r"(?<=[.!])\s+", text)
+    return parts[-1].strip().lower()
 
 
 def main():
     label = sys.argv[1] if len(sys.argv) > 1 else "run"
-    hot, skipped = load_hot_leads()
+    segments = load_leads()
+    hot = segments["hot"]
+    review_count = len(segments["needs_review"])
 
     if not hot:
         print("No hot leads found in leads.csv. Nothing to score.")
@@ -62,23 +65,16 @@ def main():
             count += 1
             print(f"Generating {count}/{total}: {lead['name']} (run {run})")
             try:
-                message = write_message(lead["name"], lead["days"])
+                message = write_message(lead["name"], lead["days"],
+                                        lead["service"], lead["quote_sent"])
             except Exception as error:
                 errors += 1
                 print(f"  API error, skipping this one: {error}")
                 continue
 
-            passed = {}
-            for check_name, check in CHECKS:
-                passed[check_name] = check(message, lead["days"])
-
-            results.append({
-                "name": lead["name"],
-                "days": lead["days"],
-                "run": run,
-                "message": message,
-                "passed": passed,
-            })
+            passed = {name: check(message, lead) for name, check in CHECKS}
+            results.append({"lead": lead, "run": run,
+                            "message": message, "passed": passed})
 
     scored = len(results)
     if scored == 0:
@@ -92,23 +88,45 @@ def main():
     lines.append(f"Hot leads: {len(hot)} | Messages scored: {scored} of {total}")
     if errors:
         lines.append(f"WARNING: {errors} API call(s) failed and were not scored")
-    if skipped:
-        lines.append(f"Note: {skipped} row(s) in leads.csv had a bad days value and were skipped")
+    if review_count:
+        lines.append(f"Note: {review_count} row(s) in leads.csv went to needs_review and were not scored")
     lines.append("")
+
     lines.append("Pass rate per check:")
-    for check_name, _ in CHECKS:
-        n = sum(1 for r in results if r["passed"][check_name])
-        lines.append(f"  {check_name:<16} {n}/{scored}  ({100 * n / scored:.0f}%)")
+    for name, _ in CHECKS:
+        n = sum(1 for r in results if r["passed"][name])
+        lines.append(f"  {name:<16} {n}/{scored}  ({100 * n / scored:.0f}%)")
     all_pass = sum(1 for r in results if all(r["passed"].values()))
     lines.append(f"  {'ALL checks':<16} {all_pass}/{scored}  ({100 * all_pass / scored:.0f}%)")
+    lines.append("")
+
+    lines.append("Repetition: how alike each lead's messages are (lower = more varied)")
+    every_score = []
+    for lead in hot:
+        msgs = [r["message"] for r in results if r["lead"]["name"] == lead["name"]]
+        scores = [similarity(a, b) for a, b in combinations(msgs, 2)]
+        if scores:
+            every_score.extend(scores)
+            lines.append(f"  {lead['name']:<10} average {100 * sum(scores) / len(scores):.0f}%"
+                         f"   most alike pair {100 * max(scores):.0f}%")
+    if every_score:
+        lines.append(f"  {'OVERALL':<10} average {100 * sum(every_score) / len(every_score):.0f}%")
+    lines.append("")
+
+    lines.append("Most common closing questions:")
+    endings = Counter(final_question(r["message"]) for r in results)
+    for question, n in endings.most_common(3):
+        lines.append(f"  {n}x  {question}")
     lines.append("")
     lines.append("=" * 60)
 
     for r in results:
+        lead = r["lead"]
         failed = [name for name, ok in r["passed"].items() if not ok]
         status = "PASS" if not failed else "FAIL: " + ", ".join(failed)
         lines.append("")
-        lines.append(f"{r['name']} ({r['days']} days) run {r['run']} - {status}")
+        lines.append(f"{lead['name']} ({lead['days']} days, {lead['service']}, "
+                     f"quote sent: {lead['quote_sent']}) run {r['run']} - {status}")
         lines.append(r["message"])
 
     report = "\n".join(lines)

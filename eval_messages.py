@@ -78,6 +78,21 @@ def check_no_fault_admission(message):
         if phrase in text:
             return False
     return True
+
+def check_quote_consistency(message, quote_sent):
+    # quote_sent "yes": the message must mention the quote.
+    # quote_sent "no": it must not mention a quote, price, estimate or cost.
+    text = message.lower()
+    if quote_sent == "yes":
+        return "quote" in text
+    for word in ["quote", "price", "estimate", "cost"]:
+        if word in text:
+            return False
+    return True
+
+
+def check_mentions_service(message, service):
+    return service.lower() in message.lower()
 # Tests (expected output in the comment on each line)
 if __name__ == "__main__":
 
