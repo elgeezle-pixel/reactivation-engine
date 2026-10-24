@@ -7,31 +7,9 @@ from difflib import SequenceMatcher
 from itertools import combinations
 
 from read_leads import load_leads, write_message
-from eval_messages import (
-    check_length,
-    check_question,
-    check_banned_phrases,
-    check_time_gap,
-    check_no_invented_claims,
-    check_no_fault_admission,
-    check_quote_consistency,
-    check_mentions_service,
-)
+from eval_messages import CHECKS
 
 RUNS_PER_LEAD = 5
-
-# Each check receives the message and the full lead, so checks that need
-# the day count, quote status or service can read them.
-CHECKS = [
-    ("length", lambda m, lead: check_length(m)),
-    ("one_question", lambda m, lead: check_question(m)),
-    ("banned_phrases", lambda m, lead: check_banned_phrases(m)),
-    ("time_gap", lambda m, lead: check_time_gap(m, lead["days"])),
-    ("no_invented", lambda m, lead: check_no_invented_claims(m)),
-    ("no_fault", lambda m, lead: check_no_fault_admission(m)),
-    ("quote_match", lambda m, lead: check_quote_consistency(m, lead["quote_sent"])),
-    ("names_service", lambda m, lead: check_mentions_service(m, lead["service"])),
-]
 
 
 def similarity(a, b):

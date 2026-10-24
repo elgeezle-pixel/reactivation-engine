@@ -93,6 +93,21 @@ def check_quote_consistency(message, quote_sent):
 
 def check_mentions_service(message, service):
     return service.lower() in message.lower()
+
+CHECKS = [
+    ("length", lambda m, lead: check_length(m)),
+    ("one_question", lambda m, lead: check_question(m)),
+    ("banned_phrases", lambda m, lead: check_banned_phrases(m)),
+    ("time_gap", lambda m, lead: check_time_gap(m, lead["days"])),
+    ("no_invented", lambda m, lead: check_no_invented_claims(m)),
+    ("no_fault", lambda m, lead: check_no_fault_admission(m)),
+    ("quote_match", lambda m, lead: check_quote_consistency(m, lead["quote_sent"])),
+    ("names_service", lambda m, lead: check_mentions_service(m, lead["service"])),
+]
+
+
+def failed_checks(message, lead):
+    return [name for name, check in CHECKS if not check(message, lead)]
 # Tests (expected output in the comment on each line)
 if __name__ == "__main__":
 

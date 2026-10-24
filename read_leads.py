@@ -1,13 +1,21 @@
 import csv
 import os
+from datetime import datetime
+
 from dotenv import load_dotenv
 from anthropic import Anthropic
 
+from eval_messages import failed_checks
+
 load_dotenv()
 
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# max_retries: the SDK automatically retries dropped connections and
+# temporary server errors. 4 retries makes a flaky network less likely
+# to break a run.
+client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), max_retries=4)
 
 REQUIRED_COLUMNS = ["name", "phone", "service", "days_since_contact", "quote_sent"]
+REVIEW_COLUMNS = REQUIRED_COLUMNS + ["message", "flags", "approved"]
 
 
 def classify(days):
@@ -64,8 +72,9 @@ def load_leads(path="leads.csv"):
 def build_prompt(name, days, service, quote_sent):
     if quote_sent == "yes":
         situation = (
-            f"{name} asked us for a quote for {service} {days} days ago. "
-            "We sent them the quote. They have not replied since."
+            f"{name} asked us for a quote for {service}, and we sent them "
+            f"the quote. Our last contact with them was {days} days ago. "
+            "They have not replied since."
         )
         quote_rule = (
             "- Ask whether they have had a chance to look at the quote. "
@@ -73,8 +82,9 @@ def build_prompt(name, days, service, quote_sent):
         )
     else:
         situation = (
-            f"{name} asked us about {service} {days} days ago. "
-            "They have not replied since. No quote has been sent."
+            f"{name} asked us about {service}. No quote has been sent. "
+            f"Our last contact with them was {days} days ago. "
+            "They have not replied since."
         )
         quote_rule = (
             "- Never mention a quote, price, estimate or cost. "
@@ -93,9 +103,11 @@ Rules:
 - Under 35 words
 - No emoji
 - Mention the service ({service}) by name
-- State the time gap as exactly "{days} days", written in digits. Do
-  not round it, do not convert it to weeks, and do not put "about" or
-  "around" in front of it.
+- Describe the gap as time since we were last in touch, as exactly
+  "{days} days", written in digits. Do not say it has been {days} days
+  since they asked or since the quote was sent; we only know when we
+  last spoke. Do not round it, do not convert it to weeks, and do not
+  put "about" or "around" in front of it.
 - Ask exactly one question, and make it the last sentence. It must be
   answerable in three words or fewer. Do not offer two options joined
   by "or". Nothing comes after the question.
@@ -136,7 +148,6 @@ def main():
 
     for name in ["hot", "warm", "cold", "needs_review"]:
         print(f"{name}: {len(segments[name])}")
-
     for lead in segments["needs_review"]:
         print(f"  needs review - {lead['name'] or '(no name)'}: {lead['problem']}")
 
@@ -146,16 +157,41 @@ def main():
     write_segment("needs_review.csv", segments["needs_review"],
                   REQUIRED_COLUMNS + ["problem"])
 
+    hot = segments["hot"]
+    if not hot:
+        print("No hot leads, so no messages to write.")
+        return
+
     print()
-    for lead in segments["hot"]:
-        message = write_message(lead["name"], lead["days"],
-                                lead["service"], lead["quote_sent"])
-        print(f"---{lead['name']} ({lead['service']}, quote sent: {lead['quote_sent']})---")
-        print(message)
-        print()
+    rows = []
+    for i, lead in enumerate(hot, 1):
+        print(f"Writing {i}/{len(hot)}: {lead['name']}")
+        try:
+            message = write_message(lead["name"], lead["days"],
+                                    lead["service"], lead["quote_sent"])
+            flags = ", ".join(failed_checks(message, lead))
+        except Exception as error:
+            message = ""
+            flags = f"API error: {error}"
+        row = {c: lead[c] for c in REQUIRED_COLUMNS}
+        row.update({"message": message, "flags": flags, "approved": ""})
+        rows.append(row)
+
+    os.makedirs("review", exist_ok=True)
+    filename = f"review/{datetime.now().strftime('%Y-%m-%d_%H%M')}_review.csv"
+    # utf-8-sig so Excel shows apostrophes and naira signs correctly
+    with open(filename, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=REVIEW_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    flagged = sum(1 for r in rows if r["flags"])
+    print()
+    print(f"Wrote {len(rows)} message(s) to {filename}")
+    print(f"{flagged} flagged by the checks. Read those first.")
+    print("Nothing has been sent. Read every message and put yes or no")
+    print("in the 'approved' column. Only send rows marked yes.")
 
 
 if __name__ == "__main__":
     main()
-
-    
