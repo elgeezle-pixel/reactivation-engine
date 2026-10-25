@@ -3,3 +3,8 @@
 __pycache__/
 eval_results/
 review/
+hot_leads.csv
+warm_leads.csv
+cold_leads.csv
+needs_review.csv
+clients/
