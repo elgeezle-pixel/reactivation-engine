@@ -1,5 +1,6 @@
 import csv
 import json
+import re
 import sys
 from datetime import date, datetime
 
@@ -10,6 +11,9 @@ REQUIRED_SETTINGS = ["clinic_name", "greeting", "skip_under_months",
 # Accepted date formats. Slashes and dashes are read day-first
 # (25/10/2026), which is the Nigerian convention.
 DATE_FORMATS = ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"]
+
+# Matches dates like 05/03/2025 or 5-3-2025 (the ambiguous kind)
+SHORT_DATE = re.compile(r"^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$")
 
 SEGMENTS = ["recent", "due", "lapsed", "long_gone", "needs_review"]
 
@@ -24,6 +28,33 @@ def load_settings(path):
             < settings["lapsed_until_months"]):
         raise ValueError("Month cut-offs must increase: skip < due < lapsed")
     return settings
+
+
+def check_date_order(values):
+    """Stop the run if any date proves the file is month-first.
+    Return a warning if no date proves which order the file uses."""
+    proven_day_first = False
+    ambiguous = 0
+    for text in values:
+        match = SHORT_DATE.match(text.strip())
+        if not match:
+            continue
+        first, second = int(match.group(1)), int(match.group(2))
+        if second > 12 and first <= 12:
+            raise ValueError(
+                f"Date '{text}' can only be month-first, but this tool reads "
+                "dates day-first. Every date in this file would be misread. "
+                "Confirm the clinic's date format before running."
+            )
+        if first > 12:
+            proven_day_first = True
+        else:
+            ambiguous += 1
+    if ambiguous and not proven_day_first:
+        return (f"WARNING: {ambiguous} date(s) like 05/03/2025 could be "
+                "day-first or month-first, and nothing in this file proves "
+                "which. Confirm the format with the clinic before sending.")
+    return None
 
 
 def parse_date(text):
@@ -59,20 +90,22 @@ def digits_only(phone):
 
 def load_patients(path, settings, today):
     """Read and check the patient file. Every row with a problem goes to
-    needs_review with a reason, instead of being guessed at."""
+    needs_review with a reason, instead of being guessed at.
+    Returns (segments, date_warning)."""
     with open(path, encoding="utf-8-sig") as f:
         reader = csv.DictReader(f, skipinitialspace=True)
         columns = [c.strip() for c in (reader.fieldnames or [])]
         missing = [c for c in REQUIRED_COLUMNS if c not in columns]
         if missing:
             raise ValueError(f"{path} is missing column(s): {', '.join(missing)}")
-        rows = list(reader)
+        rows = [{(k or "").strip(): v for k, v in r.items()} for r in reader]
+
+    date_warning = check_date_order([(r.get("last_visit") or "") for r in rows])
 
     segments = {s: [] for s in SEGMENTS}
     seen_phones = {}
 
     for row in rows:
-        row = {(k or "").strip(): v for k, v in row.items()}
         patient = {c: (row.get(c) or "").strip() for c in REQUIRED_COLUMNS}
 
         problems = []
@@ -102,7 +135,7 @@ def load_patients(path, settings, today):
         patient["months"] = months_between(visit, today)
         segments[segment_for(patient["months"], settings)].append(patient)
 
-    return segments
+    return segments, date_warning
 
 
 def main():
@@ -111,9 +144,12 @@ def main():
     today = parse_date(sys.argv[2]) if len(sys.argv) > 2 else date.today()
 
     settings = load_settings(f"{folder}/settings.json")
-    segments = load_patients(f"{folder}/patients.csv", settings, today)
+    segments, date_warning = load_patients(f"{folder}/patients.csv", settings, today)
 
     print(f"Clinic: {settings['clinic_name']} | today: {today}")
+    if date_warning:
+        print()
+        print(date_warning)
     print()
     for name in SEGMENTS:
         print(f"{name}: {len(segments[name])}")
