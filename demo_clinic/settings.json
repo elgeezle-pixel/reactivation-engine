@@ -1,0 +1,8 @@
+{
+  "clinic_name": "Bright Smile Dental",
+  "greeting": "Hi",
+  "skip_under_months": 6,
+  "due_until_months": 12,
+  "lapsed_until_months": 24
+}
+
