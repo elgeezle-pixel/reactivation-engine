@@ -3,6 +3,10 @@
   "greeting": "Hi",
   "skip_under_months": 6,
   "due_until_months": 12,
-  "lapsed_until_months": 24
+  "lapsed_until_months": 24,
+  "incentive": {
+    "text": "10% off your next check-up",
+    "valid_until": "2026-11-30",
+    "segments": ["lapsed", "long_gone"]
+  }
 }
-
