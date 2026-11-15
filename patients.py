@@ -105,8 +105,9 @@ def load_patients(path, settings, today):
     segments = {s: [] for s in SEGMENTS}
     seen_phones = {}
 
-    for row in rows:
+    for row_number, row in enumerate(rows, start=2):
         patient = {c: (row.get(c) or "").strip() for c in REQUIRED_COLUMNS}
+        patient["row"] = row_number 
 
         problems = []
         if not patient["name"]:
