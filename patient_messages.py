@@ -121,6 +121,15 @@ def write_patient_message(patient, segment, settings, offer):
     )
     return response.content[0].text
 
+def check_context(patient, settings, offer):
+    return {
+        "name": patient["name"],
+        "greeting": settings["greeting"],
+        "clinic": settings["clinic_name"],
+        "gap": gap_text(patient["months"]),
+        "offer_text": offer["text"] if offer else None,
+        "offer_date": readable_date(offer["valid_until"]) if offer else None,
+    }
 
 def main():
     folder = sys.argv[1] if len(sys.argv) > 1 else "demo_clinic"
