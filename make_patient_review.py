@@ -14,9 +14,12 @@ from patient_messages import (
     gap_text,
 )
 from patient_checks import failed_patient_checks
+from contact_log import load_contacted
 
 REVIEW_COLUMNS = ["row", "name", "phone", "segment", "time_since_visit",
                   "offer", "message", "flags", "approved"]
+
+DEFAULT_COOLDOWN_DAYS = 60
 
 
 def to_whatsapp_number(phone):
@@ -45,12 +48,15 @@ def main():
     settings = load_settings(f"{folder}/settings.json")
     incentive = load_incentive(settings)
     segments, date_warning = load_patients(f"{folder}/patients.csv", settings, today)
+    cooldown = settings.get("contact_cooldown_days", DEFAULT_COOLDOWN_DAYS)
+    contacted = load_contacted(folder)
 
     if date_warning:
         print(date_warning)
         print()
 
     rows = []
+    recently_contacted = []
     api_errors = 0
     check_failures = 0
     phone_problems = 0
@@ -58,10 +64,21 @@ def main():
     for segment in MESSAGE_SEGMENTS:
         offer = offer_for(incentive, segment, today)
         for patient in segments[segment]:
+            number = to_whatsapp_number(patient["phone"])
+
+            # Skip anyone contacted within the cooldown, before writing a
+            # message, so nobody gets the same invitation twice.
+            if number and number in contacted:
+                days_ago = (today - contacted[number]).days
+                if days_ago < cooldown:
+                    recently_contacted.append(
+                        f"{patient['name']} (contacted {contacted[number].isoformat()})")
+                    continue
+
             print(f"Writing: {patient['name']} ({segment})")
             flags = []
 
-            if not to_whatsapp_number(patient["phone"]):
+            if not number:
                 flags.append("phone is not a valid Nigerian mobile number")
                 phone_problems += 1
 
@@ -89,8 +106,14 @@ def main():
                 "approved": "",
             })
 
+    print()
+    if recently_contacted:
+        print(f"Skipped, contacted in the last {cooldown} days: {len(recently_contacted)}")
+        for entry in recently_contacted:
+            print(f"    {entry}")
+
     if not rows:
-        print("No patients to message.")
+        print("No new patients to message.")
         return
 
     os.makedirs("review", exist_ok=True)
@@ -102,7 +125,6 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
-    print()
     print(f"Wrote {len(rows)} message(s) to {filename}")
     print(f"  API errors:      {api_errors}  (re-run to regenerate these)")
     print(f"  Failed checks:   {check_failures}  (read these first)")

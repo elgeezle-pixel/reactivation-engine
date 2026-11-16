@@ -8,6 +8,7 @@ from patients import load_settings
 from patient_messages import load_incentive, readable_date
 from patient_checks import failed_patient_checks
 from make_patient_review import to_whatsapp_number
+from contact_log import record_contacts
 
 
 def load_patient_rows(path):
@@ -142,6 +143,7 @@ def main():
 
         to_send.append({
             "name": name,
+            "number": number,
             "message": message,
             "warnings": warnings,
             "link": f"https://wa.me/{number}?text={quote(message)}",
@@ -151,6 +153,8 @@ def main():
     out_path = base + "_send.html"
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(build_page(settings["clinic_name"], to_send, f"Built from {review_path}"))
+    logged = record_contacts(folder, to_send, review_path)
+    print(f"Logged {logged} patient(s) as contacted in {folder}/contact_log.csv")
 
     print(f"Send list: {len(to_send)} message(s) -> {out_path}")
     print(f"  Not approved (blank or no): {not_approved}")
